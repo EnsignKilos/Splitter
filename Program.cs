@@ -4,15 +4,26 @@ using System.Text.RegularExpressions;
 const int LinesPerFile = 10_000_000;
 const int WriteBufferCapacity = 1_000_000;
 
-if (args.Length != 3)
+if (args.Length != 4)
 {
-    Console.WriteLine("Usage: FileSplitter <folder_path> <regex_pattern> <output_path>");
+    Console.WriteLine("Usage: FileSplitter <folder_path> <regex_pattern> <output_path> <mode>");
+    Console.WriteLine("  mode: 'include' - write lines that match the regex");
+    Console.WriteLine("        'exclude' - write lines that don't match the regex");
     return;
 }
 
 string folderPath = args[0];
 string pattern = args[1];
 string outputFolder = args[2];
+string mode = args[3].ToLowerInvariant();
+
+if (mode != "include" && mode != "exclude")
+{
+    Console.WriteLine("Error: Mode must be either 'include' or 'exclude'");
+    return;
+}
+
+bool includeMatches = mode == "include";
 
 if (!Directory.Exists(folderPath))
 {
@@ -38,13 +49,16 @@ Directory.CreateDirectory(outputFolder);
 
 var textFiles = Directory.GetFiles(folderPath, "*.txt", SearchOption.TopDirectoryOnly);
 
+Console.WriteLine($"Mode: {(includeMatches ? "Including" : "Excluding")} lines that match the pattern");
+
 for (int fileIndex = 0; fileIndex < textFiles.Length; fileIndex++)
 {
-    Console.WriteLine($"Processing {fileIndex + 1}/{textFiles.Length}: {Path.GetFileName(textFiles[fileIndex])}");
-    ProcessFile(textFiles[fileIndex], outputFolder, stringRegex);
+    Console.Write($"\rProcessing {fileIndex + 1}/{textFiles.Length}: {Path.GetFileName(textFiles[fileIndex])} {(double)fileIndex / textFiles.Length:P0} Done          ");
+    ProcessFile(textFiles[fileIndex], outputFolder, stringRegex, includeMatches);
 }
+Console.WriteLine();
 
-static void ProcessFile(string inputFile, string outputFolder, Regex suppliedRegex)
+static void ProcessFile(string inputFile, string outputFolder, Regex suppliedRegex, bool includeMatches)
 {
     string baseFileName = Path.GetFileNameWithoutExtension(inputFile);
     int partNumber = 1;
@@ -70,7 +84,9 @@ static void ProcessFile(string inputFile, string outputFolder, Regex suppliedReg
         {
             totalLinesProcessed++;
 
-            if (!suppliedRegex.IsMatch(line))
+            bool isMatch = suppliedRegex.IsMatch(line);
+            
+            if (includeMatches != isMatch)
                 continue;
 
             validLinesCount++;
@@ -100,7 +116,7 @@ static void ProcessFile(string inputFile, string outputFolder, Regex suppliedReg
                     currentLineCount = 0;
 
                     if (validLinesCount % 10_000_000 == 0)
-                        Console.WriteLine($"  {totalLinesProcessed:N0} lines processed, {validLinesCount:N0} valid lines");
+                        Console.Write($"\r  {totalLinesProcessed:N0} lines processed, {validLinesCount:N0} valid lines          ");
                 }
             }
         }
@@ -115,5 +131,5 @@ static void ProcessFile(string inputFile, string outputFolder, Regex suppliedReg
         writer?.Dispose();
     }
 
-    Console.WriteLine($"  Completed: {totalLinesProcessed:N0} total lines, {validLinesCount:N0} valid lines written");
+    Console.WriteLine($"\n  Completed: {totalLinesProcessed:N0} total lines, {validLinesCount:N0} valid lines written");
 }

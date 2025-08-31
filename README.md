@@ -1,4 +1,5 @@
 (AI SLOP AHEAD):
+
 # FileSplitter
 
 A high-performance C# utility for splitting massive wordlists and dictionaries based on regex pattern matching. Purpose-built for processing multi-gigabyte password lists, dictionaries, and text corpora with minimal memory footprint.
@@ -9,7 +10,7 @@ A high-performance C# utility for splitting massive wordlists and dictionaries b
 - **Large file handling**: Efficiently processes multi-gigabyte dictionaries and wordlists
 - **Automatic file splitting**: Splits output into manageable chunks (10 million lines per file)
 - **Memory optimised**: Uses buffered writing with 1 million line buffer capacity
-- **Progress tracking**: Real-time processing statistics and completion percentage
+- **Progress tracking**: Real-time processing statistics and completion percentage (in a mega basic way)
 - **Batch processing**: Processes all `.txt` files in a directory automatically
 
 ## Requirements

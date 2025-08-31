@@ -4,14 +4,15 @@ using System.Text.RegularExpressions;
 const int LinesPerFile = 10_000_000;
 const int WriteBufferCapacity = 1_000_000;
 
-if (args.Length != 2)
+if (args.Length != 3)
 {
-    Console.WriteLine("Usage: FileSplitter <folder_path> <regex_pattern>");
+    Console.WriteLine("Usage: FileSplitter <folder_path> <regex_pattern> <output_path>");
     return;
 }
 
 string folderPath = args[0];
 string pattern = args[1];
+string outputFolder = args[2];
 
 if (!Directory.Exists(folderPath))
 {
@@ -33,14 +34,13 @@ catch (ArgumentException ex)
     return;
 }
 
-string outputFolder = Path.Combine(folderPath, "split_output");
 Directory.CreateDirectory(outputFolder);
 
 var textFiles = Directory.GetFiles(folderPath, "*.txt", SearchOption.TopDirectoryOnly);
 
 for (int fileIndex = 0; fileIndex < textFiles.Length; fileIndex++)
 {
-    Console.WriteLine($"Processing {fileIndex + 1}/{textFiles.Length}: {Path.GetFileName(textFiles[fileIndex])} {fileIndex / textFiles.Length:P}% Done");
+    Console.WriteLine($"Processing {fileIndex + 1}/{textFiles.Length}: {Path.GetFileName(textFiles[fileIndex])}");
     ProcessFile(textFiles[fileIndex], outputFolder, stringRegex);
 }
 

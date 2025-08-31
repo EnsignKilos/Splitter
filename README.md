@@ -1,21 +1,20 @@
-(AI SLOP AHEAD):
-
 # FileSplitter
 
-A high-performance C# utility for splitting massive wordlists and dictionaries based on regex pattern matching. Purpose-built for processing multi-gigabyte password lists, dictionaries, and text corpora with minimal memory footprint.
+A high-performance C# utility for splitting massive wordlists and dictionaries based on regex pattern matching. Purpose-built for processing multi-gigabyte password lists, dictionaries, and text corpora with minimal memory footprint. Automatically separates matching and non-matching lines into separate output directories.
 
 ## Features
 
-- **Regex-based filtering**: Extract specific patterns from wordlists (length, character sets, formats)
+- **Dual output streams**: Simultaneously writes matches and non-matches to separate directories
+- **Regex-based filtering**: Extract or exclude specific patterns from wordlists (length, character sets, formats)
 - **Large file handling**: Efficiently processes multi-gigabyte dictionaries and wordlists
 - **Automatic file splitting**: Splits output into manageable chunks (10 million lines per file)
-- **Memory optimised**: Uses buffered writing with 1 million line buffer capacity
-- **Progress tracking**: Real-time processing statistics and completion percentage (in a mega basic way)
+- **Memory optimised**: Uses dual buffered writing with 1 million line buffer capacity per stream
+- **Progress tracking**: Real-time processing statistics with filename truncation for better display
 - **Batch processing**: Processes all `.txt` files in a directory automatically
 
 ## Requirements
 
-- .NET 8.0 or later
+- .NET 9.0 or later
 - Windows, Linux, or macOS
 
 ## Installation
@@ -43,50 +42,61 @@ FileSplitter <folder_path> <regex_pattern> <output_path>
 ### Parameters
 
 - `folder_path`: Directory containing `.txt` files to process
-- `regex_pattern`: Regular expression pattern to match lines for inclusion
-- `output_path`: Directory where filtered files will be placed.
+- `regex_pattern`: Regular expression pattern to match lines
+- `output_path`: Base directory where output folders will be created
+
+### Output Structure
+
+The utility creates two subdirectories in your output path:
+- `<output_path>/matches/` - Contains lines that match the regex pattern
+- `<output_path>/non-matches/` - Contains lines that don't match the regex pattern
+
+Both matching and non-matching lines are preserved, allowing you to:
+- Keep matched patterns for targeted attacks
+- Retain non-matches for different pattern extraction or verification
 
 ### Examples
 
 ```bash
-# Extract 8-character passwords only
-FileSplitter /path/to/wordlists "^.{8}$"
+# Separate 8-character passwords from others
+FileSplitter /path/to/wordlists "^.{8}$" /output/folder
 
-# Extract passwords with uppercase, lowercase, and numbers
-FileSplitter ./dictionaries "^(?=.*[a-z])(?=.*[A-Z])(?=.*\d).+$"
+# Split passwords with uppercase, lowercase, and numbers from those without
+FileSplitter ./dictionaries "^(?=.*[a-z])(?=.*[A-Z])(?=.*\d).+$" ./output
 
-# Extract words starting with specific prefix
-FileSplitter C:\wordlists "^admin"
+# Extract words starting with 'admin' (rest go to non-matches)
+FileSplitter C:\wordlists "^admin" C:\output
 
-# Extract numeric-only strings
-FileSplitter ./passwords "^\d+$"
+# Separate numeric-only strings from mixed content
+FileSplitter ./passwords "^\d+$" ./filtered
 
-# Extract passwords between 6-12 characters
-FileSplitter /wordlists "^.{6,12}$"
+# Split passwords between 6-12 characters from others
+FileSplitter /wordlists "^.{6,12}$" /processed
 
-# Extract entries containing special characters
-FileSplitter ./dictionaries "[!@#$%^&*()_+\-=\[\]{};':\"\\|,.<>\/?]"
+# Separate entries containing special characters
+FileSplitter ./dictionaries "[!@#$%^&*()_+\-=\[\]{};':\"\\|,.<>\/?]" ./sorted
 
-# Extract email-format entries
-FileSplitter ./combo-lists "[\w\.-]+@[\w\.-]+\.\w+"
+# Extract email-format entries (combo lists)
+FileSplitter ./combo-lists "[\w\.-]+@[\w\.-]+\.\w+" ./emails
 
-# Extract hex strings (e.g., hashes)
-FileSplitter ./hashes "^[a-fA-F0-9]+$"
+# Separate hex strings (e.g., hashes) from non-hex content
+FileSplitter ./hashes "^[a-fA-F0-9]+$" ./hex-sorted
 ```
 
-## Output
+## Output Files
 
-- Creates a `split_output` directory within the input folder
-- Output files are named: `{original_filename}_part{number}.txt`
-- Each output file contains a maximum of 10 million matching lines
-- Files are numbered sequentially (e.g., `access_log_part0001.txt`, `access_log_part0002.txt`)
+- **Matches**: `{original_filename}_matches_part{number}.txt`
+- **Non-matches**: `{original_filename}_nonmatches_part{number}.txt`
+- Each output file contains a maximum of 10 million lines
+- Files are numbered sequentially with zero-padding (e.g., `rockyou_matches_part0001.txt`)
 
 ## Performance Characteristics
 
-- **Write buffer**: 1 million lines (reduces I/O operations)
+- **Dual write buffers**: 1 million lines each for matches and non-matches
 - **Lines per file**: 10 million (configurable in source)
-- **Memory usage**: Minimal, uses streaming and buffered writes
+- **Memory usage**: Minimal, uses streaming with dual buffered writes
 - **Regex engine**: Compiled, culture-invariant, non-backtracking for optimal performance
+- **Progress display**: Truncates long filenames for cleaner output
 
 ## Technical Details
 
@@ -97,19 +107,21 @@ FileSplitter ./hashes "^[a-fA-F0-9]+$"
 
 ### File Processing
 - Streams input files to minimise memory usage
-- Buffered writing reduces disk I/O operations
+- Dual buffered writing for both output streams
 - UTF-8 encoding for input and output
 - Automatic resource disposal with proper exception handling
+- Simultaneous writing to both match and non-match streams
 
 ## Use Cases
 
-- **Password Analysis**: Split large password dumps by complexity patterns
-- **Dictionary Management**: Organise wordlists by length, character sets, or patterns
-- **Hashcat/John Preparation**: Create targeted wordlists for specific attack patterns
-- **Combo List Processing**: Extract username:password pairs or email:password formats
-- **Security Testing**: Filter wordlists for specific compliance testing requirements
-- **Linguistic Analysis**: Extract words matching specific linguistic patterns
-- **Data Sanitisation**: Remove or extract entries with specific characteristics
+- **Password Complexity Analysis**: Separate passwords by complexity patterns whilst retaining simpler ones
+- **Dictionary Stratification**: Organise wordlists by characteristics for phased attacks
+- **Hashcat/John Preparation**: Create both targeted and exclusion wordlists simultaneously
+- **Combo List Processing**: Separate valid email:password formats from malformed entries
+- **Compliance Testing**: Split wordlists into compliant and non-compliant sets
+- **Pattern Validation**: Verify regex patterns by reviewing both matches and non-matches
+- **Data Quality Control**: Identify and separate malformed entries from valid data
+- **Multi-stage Processing**: Use non-matches from one pattern as input for different patterns
 
 ## Error Handling
 
@@ -118,6 +130,7 @@ The utility includes comprehensive error handling for:
 - Malformed regex patterns
 - File access permissions
 - Disk space issues
+- Buffer overflow protection
 
 ## Building and Contributing
 
@@ -136,7 +149,7 @@ dotnet test
 
 ## Licence
 
-I don't mind if you use it however you like - it's not exacxtly rocket surgery.
+Use it however you like - it's not exactly rocket surgery.
 
 ## Author
 
@@ -145,7 +158,7 @@ Security Researcher | Red Teamer | Penetration Tester
 
 ## Acknowledgements
 
-Built for high-performance wordlist processing and dictionary management in penetration testing and security research workflows.
+Built for high-performance wordlist processing and dictionary management in penetration testing and security research workflows. Designed to preserve all data whilst enabling efficient pattern-based separation.
 
 ## Support
 

@@ -134,7 +134,7 @@ dotnet test
 
 ## Licence
 
-[Specify your licence here]
+I don't mind if you use it however you like - it's not exacxtly rocket surgery.
 
 ## Author
 

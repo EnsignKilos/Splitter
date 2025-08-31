@@ -37,13 +37,14 @@ dotnet publish -c Release -r win-x64 --self-contained
 ## Usage
 
 ```bash
-FileSplitter <folder_path> <regex_pattern>
+FileSplitter <folder_path> <regex_pattern> <output_path>
 ```
 
 ### Parameters
 
 - `folder_path`: Directory containing `.txt` files to process
 - `regex_pattern`: Regular expression pattern to match lines for inclusion
+- `output_path`: Directory where filtered files will be placed.
 
 ### Examples
 

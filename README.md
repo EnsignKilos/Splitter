@@ -1,13 +1,12 @@
 (AI SLOP AHEAD):
-
 # FileSplitter
 
-A high-performance C# utility for splitting large text files based on regex pattern matching. Designed for efficient processing of massive datasets with minimal memory footprint.
+A high-performance C# utility for splitting massive wordlists and dictionaries based on regex pattern matching. Purpose-built for processing multi-gigabyte password lists, dictionaries, and text corpora with minimal memory footprint.
 
 ## Features
 
-- **Regex-based filtering**: Process only lines matching your specified pattern
-- **Large file handling**: Efficiently processes multi-gigabyte text files
+- **Regex-based filtering**: Extract specific patterns from wordlists (length, character sets, formats)
+- **Large file handling**: Efficiently processes multi-gigabyte dictionaries and wordlists
 - **Automatic file splitting**: Splits output into manageable chunks (10 million lines per file)
 - **Memory optimised**: Uses buffered writing with 1 million line buffer capacity
 - **Progress tracking**: Real-time processing statistics and completion percentage
@@ -48,17 +47,29 @@ FileSplitter <folder_path> <regex_pattern>
 ### Examples
 
 ```bash
-# Extract all lines containing IP addresses
-FileSplitter /path/to/logs "\b(?:[0-9]{1,3}\.){3}[0-9]{1,3}\b"
+# Extract 8-character passwords only
+FileSplitter /path/to/wordlists "^.{8}$"
 
-# Extract lines with email addresses
-FileSplitter ./data "[\w\.-]+@[\w\.-]+\.\w+"
+# Extract passwords with uppercase, lowercase, and numbers
+FileSplitter ./dictionaries "^(?=.*[a-z])(?=.*[A-Z])(?=.*\d).+$"
 
-# Extract lines containing specific keywords
-FileSplitter C:\logs "error|warning|critical"
+# Extract words starting with specific prefix
+FileSplitter C:\wordlists "^admin"
 
-# Extract lines with timestamps
-FileSplitter ./audit "^\d{4}-\d{2}-\d{2}"
+# Extract numeric-only strings
+FileSplitter ./passwords "^\d+$"
+
+# Extract passwords between 6-12 characters
+FileSplitter /wordlists "^.{6,12}$"
+
+# Extract entries containing special characters
+FileSplitter ./dictionaries "[!@#$%^&*()_+\-=\[\]{};':\"\\|,.<>\/?]"
+
+# Extract email-format entries
+FileSplitter ./combo-lists "[\w\.-]+@[\w\.-]+\.\w+"
+
+# Extract hex strings (e.g., hashes)
+FileSplitter ./hashes "^[a-fA-F0-9]+$"
 ```
 
 ## Output
@@ -90,11 +101,13 @@ FileSplitter ./audit "^\d{4}-\d{2}-\d{2}"
 
 ## Use Cases
 
-- **Log Analysis**: Extract specific error patterns from application logs
-- **Data Mining**: Filter large datasets for relevant information
-- **Security Auditing**: Extract suspicious patterns from audit logs
-- **Text Processing**: Split and filter massive text corpora
-- **Compliance**: Extract specific data patterns for regulatory requirements
+- **Password Analysis**: Split large password dumps by complexity patterns
+- **Dictionary Management**: Organise wordlists by length, character sets, or patterns
+- **Hashcat/John Preparation**: Create targeted wordlists for specific attack patterns
+- **Combo List Processing**: Extract username:password pairs or email:password formats
+- **Security Testing**: Filter wordlists for specific compliance testing requirements
+- **Linguistic Analysis**: Extract words matching specific linguistic patterns
+- **Data Sanitisation**: Remove or extract entries with specific characteristics
 
 ## Error Handling
 
@@ -130,16 +143,7 @@ Security Researcher | Red Teamer | Penetration Tester
 
 ## Acknowledgements
 
-Built for high-performance text processing in security operations and data analysis workflows.
-
-## Roadmap
-
-- [ ] Parallel processing support for multiple files
-- [ ] Custom output directory specification
-- [ ] Configurable lines-per-file via command line
-- [ ] Support for additional file formats (CSV, JSON)
-- [ ] Progress bar visualisation
-- [ ] Compression options for output files
+Built for high-performance wordlist processing and dictionary management in penetration testing and security research workflows.
 
 ## Support
 

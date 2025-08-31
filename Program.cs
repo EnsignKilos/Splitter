@@ -4,26 +4,17 @@ using System.Text.RegularExpressions;
 const int LinesPerFile = 10_000_000;
 const int WriteBufferCapacity = 1_000_000;
 
-if (args.Length != 4)
+if (args.Length != 3)
 {
-    Console.WriteLine("Usage: FileSplitter <folder_path> <regex_pattern> <output_path> <mode>");
-    Console.WriteLine("  mode: 'include' - write lines that match the regex");
-    Console.WriteLine("        'exclude' - write lines that don't match the regex");
+    Console.WriteLine("Usage: FileSplitter <folder_path> <regex_pattern> <output_path>");
+    Console.WriteLine("  Matching lines will be written to: <output_path>/matches/");
+    Console.WriteLine("  Non-matching lines will be written to: <output_path>/non-matches/");
     return;
 }
 
 string folderPath = args[0];
 string pattern = args[1];
 string outputFolder = args[2];
-string mode = args[3].ToLowerInvariant();
-
-if (mode != "include" && mode != "exclude")
-{
-    Console.WriteLine("Error: Mode must be either 'include' or 'exclude'");
-    return;
-}
-
-bool includeMatches = mode == "include";
 
 if (!Directory.Exists(folderPath))
 {
@@ -45,91 +36,140 @@ catch (ArgumentException ex)
     return;
 }
 
-Directory.CreateDirectory(outputFolder);
+// Create both output directories
+string matchesFolder = Path.Combine(outputFolder, "matches");
+string nonMatchesFolder = Path.Combine(outputFolder, "non-matches");
+Directory.CreateDirectory(matchesFolder);
+Directory.CreateDirectory(nonMatchesFolder);
 
 var textFiles = Directory.GetFiles(folderPath, "*.txt", SearchOption.TopDirectoryOnly);
 
-Console.WriteLine($"Mode: {(includeMatches ? "Including" : "Excluding")} lines that match the pattern");
+Console.WriteLine($"Processing files - matches go to: {matchesFolder}");
+Console.WriteLine($"                   non-matches go to: {nonMatchesFolder}");
 
 for (int fileIndex = 0; fileIndex < textFiles.Length; fileIndex++)
 {
-    Console.Write($"\rProcessing {fileIndex + 1}/{textFiles.Length}: {Path.GetFileName(textFiles[fileIndex])} {(double)fileIndex / textFiles.Length:P0} Done          ");
-    ProcessFile(textFiles[fileIndex], outputFolder, stringRegex, includeMatches);
+    string fileName = Path.GetFileName(textFiles[fileIndex]);
+    if (fileName.Length > 40) fileName = string.Concat("...", fileName.AsSpan(fileName.Length - 37));
+    Console.Write($"\rProcessing {fileIndex + 1}/{textFiles.Length}: {fileName,-40} {(double)(fileIndex + 1) / textFiles.Length:P0}");
+    ProcessFile(textFiles[fileIndex], matchesFolder, nonMatchesFolder, stringRegex);
 }
-Console.WriteLine();
+Console.WriteLine("\n\nAll files processed.");
 
-static void ProcessFile(string inputFile, string outputFolder, Regex suppliedRegex, bool includeMatches)
+static void ProcessFile(string inputFile, string matchesFolder, string nonMatchesFolder, Regex suppliedRegex)
 {
     string baseFileName = Path.GetFileNameWithoutExtension(inputFile);
-    int partNumber = 1;
-    int currentLineCount = 0;
+    
+    // Separate tracking for matches and non-matches
+    int matchPartNumber = 1;
+    int nonMatchPartNumber = 1;
+    int matchLineCount = 0;
+    int nonMatchLineCount = 0;
     long totalLinesProcessed = 0;
-    long validLinesCount = 0;
+    long totalMatches = 0;
+    long totalNonMatches = 0;
 
-    var writeBuffer = new StringBuilder();
-    string outputFile = Path.Combine(outputFolder, $"{baseFileName}_part{partNumber:D4}.txt");
+    var matchBuffer = new StringBuilder();
+    var nonMatchBuffer = new StringBuilder();
+    
+    string matchOutputFile = Path.Combine(matchesFolder, $"{baseFileName}_matches_part{matchPartNumber:D4}.txt");
+    string nonMatchOutputFile = Path.Combine(nonMatchesFolder, $"{baseFileName}_nonmatches_part{nonMatchPartNumber:D4}.txt");
 
-    StreamWriter? writer = null;
+    StreamWriter? matchWriter = null;
+    StreamWriter? nonMatchWriter = null;
 
     try
     {
         using var fileStream = new FileStream(inputFile, FileMode.Open, FileAccess.Read, FileShare.Read);
         using var reader = new StreamReader(fileStream, Encoding.UTF8, false);
 
-        writer = new StreamWriter(outputFile, false, Encoding.UTF8);
+        matchWriter = new StreamWriter(matchOutputFile, false, Encoding.UTF8);
+        nonMatchWriter = new StreamWriter(nonMatchOutputFile, false, Encoding.UTF8);
+        
         string? line;
-        int bufferLineCount = 0;
+        int matchBufferLineCount = 0;
+        int nonMatchBufferLineCount = 0;
 
         while ((line = reader.ReadLine()) != null)
         {
             totalLinesProcessed++;
-
             bool isMatch = suppliedRegex.IsMatch(line);
             
-            if (includeMatches != isMatch)
-                continue;
-
-            validLinesCount++;
-            writeBuffer.AppendLine(line);
-            currentLineCount++;
-            bufferLineCount++;
-
-            bool needNewFile = currentLineCount >= LinesPerFile;
-            bool bufferFull = bufferLineCount >= WriteBufferCapacity;
-
-            if (bufferFull || needNewFile)
+            if (isMatch)
             {
-                writer.Write(writeBuffer.ToString());
-                writeBuffer.Clear();
-                bufferLineCount = 0;
+                totalMatches++;
+                matchBuffer.AppendLine(line);
+                matchLineCount++;
+                matchBufferLineCount++;
 
-                if (needNewFile)
+                bool needNewFile = matchLineCount >= LinesPerFile;
+                bool bufferFull = matchBufferLineCount >= WriteBufferCapacity;
+
+                if (bufferFull || needNewFile)
                 {
-                    writer.Flush();
-                    writer.Close();
-                    writer.Dispose();
+                    matchWriter.Write(matchBuffer.ToString());
+                    matchBuffer.Clear();
+                    matchBufferLineCount = 0;
 
-                    partNumber++;
-                    outputFile = Path.Combine(outputFolder, $"{baseFileName}_part{partNumber:D4}.txt");
-                    writer = new StreamWriter(outputFile, false, Encoding.UTF8);
+                    if (needNewFile)
+                    {
+                        matchWriter.Flush();
+                        matchWriter.Close();
+                        matchWriter.Dispose();
 
-                    currentLineCount = 0;
+                        matchPartNumber++;
+                        matchOutputFile = Path.Combine(matchesFolder, $"{baseFileName}_matches_part{matchPartNumber:D4}.txt");
+                        matchWriter = new StreamWriter(matchOutputFile, false, Encoding.UTF8);
 
-                    if (validLinesCount % 10_000_000 == 0)
-                        Console.Write($"\r  {totalLinesProcessed:N0} lines processed, {validLinesCount:N0} valid lines          ");
+                        matchLineCount = 0;
+                    }
+                }
+            }
+            else
+            {
+                totalNonMatches++;
+                nonMatchBuffer.AppendLine(line);
+                nonMatchLineCount++;
+                nonMatchBufferLineCount++;
+
+                bool needNewFile = nonMatchLineCount >= LinesPerFile;
+                bool bufferFull = nonMatchBufferLineCount >= WriteBufferCapacity;
+
+                if (bufferFull || needNewFile)
+                {
+                    nonMatchWriter.Write(nonMatchBuffer.ToString());
+                    nonMatchBuffer.Clear();
+                    nonMatchBufferLineCount = 0;
+
+                    if (needNewFile)
+                    {
+                        nonMatchWriter.Flush();
+                        nonMatchWriter.Close();
+                        nonMatchWriter.Dispose();
+
+                        nonMatchPartNumber++;
+                        nonMatchOutputFile = Path.Combine(nonMatchesFolder, $"{baseFileName}_nonmatches_part{nonMatchPartNumber:D4}.txt");
+                        nonMatchWriter = new StreamWriter(nonMatchOutputFile, false, Encoding.UTF8);
+
+                        nonMatchLineCount = 0;
+                    }
                 }
             }
         }
 
-        if (writeBuffer.Length > 0)
+        // Write any remaining buffered content
+        if (matchBuffer.Length > 0)
         {
-            writer.Write(writeBuffer.ToString());
+            matchWriter.Write(matchBuffer.ToString());
+        }
+        if (nonMatchBuffer.Length > 0)
+        {
+            nonMatchWriter.Write(nonMatchBuffer.ToString());
         }
     }
     finally
     {
-        writer?.Dispose();
+        matchWriter?.Dispose();
+        nonMatchWriter?.Dispose();
     }
-
-    Console.WriteLine($"\n  Completed: {totalLinesProcessed:N0} total lines, {validLinesCount:N0} valid lines written");
 }

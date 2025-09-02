@@ -4,17 +4,37 @@ using System.Text.RegularExpressions;
 const int LinesPerFile = 10_000_000;
 const int WriteBufferCapacity = 1_000_000;
 
-if (args.Length != 3)
+if (args.Length < 3 || args.Length > 4)
 {
-    Console.WriteLine("Usage: FileSplitter <folder_path> <regex_pattern> <output_path>");
+    Console.WriteLine("Usage: FileSplitter <folder_path> <regex_pattern> <output_path> [no-split]");
     Console.WriteLine("  Matching lines will be written to: <output_path>/matches/");
     Console.WriteLine("  Non-matching lines will be written to: <output_path>/non-matches/");
+    Console.WriteLine("  no-split: Optional. Add 'no-split' to keep all output in single files (no chunking)");
+    Console.WriteLine();
+    Console.WriteLine("Examples:");
+    Console.WriteLine("  FileSplitter /wordlists \"^.{8}$\" /output");
+    Console.WriteLine("  FileSplitter /wordlists \"^.{8}$\" /output no-split");
     return;
 }
 
 string folderPath = args[0];
 string pattern = args[1];
 string outputFolder = args[2];
+bool splitFiles = true;
+
+// Check for no-split flag
+if (args.Length == 4)
+{
+    if (args[3].ToLowerInvariant() == "no-split")
+    {
+        splitFiles = false;
+        Console.WriteLine("File splitting disabled - outputting to single files");
+    }
+    else
+    {
+        Console.WriteLine($"Warning: Unknown parameter '{args[3]}' ignored. Use 'no-split' to disable file chunking.");
+    }
+}
 
 if (!Directory.Exists(folderPath))
 {
@@ -46,17 +66,20 @@ var textFiles = Directory.GetFiles(folderPath, "*.txt", SearchOption.TopDirector
 
 Console.WriteLine($"Processing files - matches go to: {matchesFolder}");
 Console.WriteLine($"                   non-matches go to: {nonMatchesFolder}");
+Console.WriteLine($"Chunking: {(splitFiles ? $"Enabled ({LinesPerFile:N0} lines per file)" : "Disabled (single output files)")}");
+Console.WriteLine();
 
 for (int fileIndex = 0; fileIndex < textFiles.Length; fileIndex++)
 {
     string fileName = Path.GetFileName(textFiles[fileIndex]);
-    if (fileName.Length > 40) fileName = string.Concat("...", fileName.AsSpan(fileName.Length - 37));
-    Console.Write($"\rProcessing {fileIndex + 1}/{textFiles.Length}: {fileName,-40} {(double)(fileIndex + 1) / textFiles.Length:P0}");
-    ProcessFile(textFiles[fileIndex], matchesFolder, nonMatchesFolder, stringRegex);
+    string displayName = fileName;
+    if (displayName.Length > 40) displayName = string.Concat("...", fileName.AsSpan(fileName.Length - 37));
+    Console.Write($"\rProcessing {fileIndex + 1}/{textFiles.Length}: {displayName,-40} {(double)(fileIndex + 1) / textFiles.Length:P0}");
+    ProcessFile(textFiles[fileIndex], matchesFolder, nonMatchesFolder, stringRegex, splitFiles);
 }
 Console.WriteLine("\n\nAll files processed.");
 
-static void ProcessFile(string inputFile, string matchesFolder, string nonMatchesFolder, Regex suppliedRegex)
+static void ProcessFile(string inputFile, string matchesFolder, string nonMatchesFolder, Regex suppliedRegex, bool splitFiles)
 {
     string baseFileName = Path.GetFileNameWithoutExtension(inputFile);
     
@@ -72,8 +95,20 @@ static void ProcessFile(string inputFile, string matchesFolder, string nonMatche
     var matchBuffer = new StringBuilder();
     var nonMatchBuffer = new StringBuilder();
     
-    string matchOutputFile = Path.Combine(matchesFolder, $"{baseFileName}_matches_part{matchPartNumber:D4}.txt");
-    string nonMatchOutputFile = Path.Combine(nonMatchesFolder, $"{baseFileName}_nonmatches_part{nonMatchPartNumber:D4}.txt");
+    string matchOutputFile;
+    string nonMatchOutputFile;
+    
+    // Determine output file naming
+    if (splitFiles)
+    {
+        matchOutputFile = Path.Combine(matchesFolder, $"{baseFileName}_matches_part{matchPartNumber:D4}.txt");
+        nonMatchOutputFile = Path.Combine(nonMatchesFolder, $"{baseFileName}_nonmatches_part{nonMatchPartNumber:D4}.txt");
+    }
+    else
+    {
+        matchOutputFile = Path.Combine(matchesFolder, $"{baseFileName}_matches.txt");
+        nonMatchOutputFile = Path.Combine(nonMatchesFolder, $"{baseFileName}_nonmatches.txt");
+    }
 
     StreamWriter? matchWriter = null;
     StreamWriter? nonMatchWriter = null;
@@ -102,7 +137,7 @@ static void ProcessFile(string inputFile, string matchesFolder, string nonMatche
                 matchLineCount++;
                 matchBufferLineCount++;
 
-                bool needNewFile = matchLineCount >= LinesPerFile;
+                bool needNewFile = splitFiles && matchLineCount >= LinesPerFile;
                 bool bufferFull = matchBufferLineCount >= WriteBufferCapacity;
 
                 if (bufferFull || needNewFile)
@@ -132,7 +167,7 @@ static void ProcessFile(string inputFile, string matchesFolder, string nonMatche
                 nonMatchLineCount++;
                 nonMatchBufferLineCount++;
 
-                bool needNewFile = nonMatchLineCount >= LinesPerFile;
+                bool needNewFile = splitFiles && nonMatchLineCount >= LinesPerFile;
                 bool bufferFull = nonMatchBufferLineCount >= WriteBufferCapacity;
 
                 if (bufferFull || needNewFile)

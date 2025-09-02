@@ -1,4 +1,5 @@
-﻿using System.Text;
+﻿using System.Diagnostics;
+using System.Text;
 using System.Text.RegularExpressions;
 
 const int LinesPerFile = 10_000_000;
@@ -47,8 +48,7 @@ try
 {
     stringRegex = new Regex(pattern,
     RegexOptions.Compiled |
-    RegexOptions.CultureInvariant | 
-    RegexOptions.NonBacktracking);
+    RegexOptions.CultureInvariant);
 }
 catch (ArgumentException ex)
 {
@@ -64,6 +64,13 @@ Directory.CreateDirectory(nonMatchesFolder);
 
 var textFiles = Directory.GetFiles(folderPath, "*.txt", SearchOption.TopDirectoryOnly);
 
+if (textFiles.Length == 0)
+{
+    Console.WriteLine($"Error: No .txt files found in {folderPath}");
+    return;
+}
+
+Console.WriteLine($"Found {textFiles.Length} .txt file(s) to process");
 Console.WriteLine($"Processing files - matches go to: {matchesFolder}");
 Console.WriteLine($"                   non-matches go to: {nonMatchesFolder}");
 Console.WriteLine($"Chunking: {(splitFiles ? $"Enabled ({LinesPerFile:N0} lines per file)" : "Disabled (single output files)")}");
@@ -74,10 +81,13 @@ for (int fileIndex = 0; fileIndex < textFiles.Length; fileIndex++)
     string fileName = Path.GetFileName(textFiles[fileIndex]);
     string displayName = fileName;
     if (displayName.Length > 40) displayName = string.Concat("...", fileName.AsSpan(fileName.Length - 37));
-    Console.Write($"\rProcessing {fileIndex + 1}/{textFiles.Length}: {displayName,-40} {(double)(fileIndex + 1) / textFiles.Length:P0}");
+    
+    Console.WriteLine($"Processing {fileIndex + 1}/{textFiles.Length}: {displayName}");
+    
     ProcessFile(textFiles[fileIndex], matchesFolder, nonMatchesFolder, stringRegex, splitFiles);
 }
-Console.WriteLine("\n\nAll files processed.");
+
+Console.WriteLine("\nAll files processed.");
 
 static void ProcessFile(string inputFile, string matchesFolder, string nonMatchesFolder, Regex suppliedRegex, bool splitFiles)
 {
@@ -94,6 +104,9 @@ static void ProcessFile(string inputFile, string matchesFolder, string nonMatche
 
     var matchBuffer = new StringBuilder();
     var nonMatchBuffer = new StringBuilder();
+    
+    // Speed tracking
+    var stopwatch = Stopwatch.StartNew();
     
     string matchOutputFile;
     string nonMatchOutputFile;
@@ -190,6 +203,15 @@ static void ProcessFile(string inputFile, string matchesFolder, string nonMatche
                     }
                 }
             }
+            
+            // Show progress every 500,000 lines
+            if (totalLinesProcessed % 500_000 == 0 && totalLinesProcessed > 0)
+            {
+                double elapsedSeconds = stopwatch.Elapsed.TotalSeconds;
+                double linesPerSecond = totalLinesProcessed / elapsedSeconds;
+                
+                Console.Write($"\r  {linesPerSecond:N0} lines/sec | {totalMatches:N0} matches, {totalNonMatches:N0} non-matches          ");
+            }
         }
 
         // Write any remaining buffered content
@@ -201,9 +223,19 @@ static void ProcessFile(string inputFile, string matchesFolder, string nonMatche
         {
             nonMatchWriter.Write(nonMatchBuffer.ToString());
         }
+        
+        // Final statistics
+        Console.Write($"\r  Complete: {totalLinesProcessed:N0} lines | {totalMatches:N0} matches, {totalNonMatches:N0} non-matches          ");
+        Console.WriteLine();
+        if (splitFiles && (matchPartNumber > 1 || nonMatchPartNumber > 1))
+        {
+            Console.WriteLine($"  Files created: {matchPartNumber} match part(s), {nonMatchPartNumber} non-match part(s)");
+        }
     }
     finally
     {
+        matchWriter?.Flush();
+        nonMatchWriter?.Flush();
         matchWriter?.Dispose();
         nonMatchWriter?.Dispose();
     }
